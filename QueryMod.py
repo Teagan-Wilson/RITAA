@@ -17,7 +17,7 @@ db = client.queue
 timestamp = int(time.time())
 ipurl = 'https://graylog.shickusa.com:12900/search/universal/relative?query=*&range=60&limit=1000&filter=streams:5798f1ad4894b436df435fa6'
 dnsurl = 'https://graylog.shickusa.com:12900/search/universal/relative?query=*&range=60&limit=1000&filter=streams:579a55dc4894b42940bbad7f'
-auth = ("Display", "S++HMefn9W6CRPLyZBH^mrGb@WK8RAqbcKQ-f*aEPt5CBh3zSb^SrUkE8wjT-45vdhKpfdWj*5LaM&AQ&!&ExtnsAQu6RP3U!hP$5e+&^@CeTJVxuX#Gp-NLM^2G23WX")
+auth = ("Display", "S++HMefn9W6CRPLyZBH^mrGb@WK8RAqbcKQ-f*aEPt5CBh3zSb^SrUkE8wjT-45vdhKpfdWj*5LaM&AQ&!&ExtnsAQu6RP3U!hP$5e+&^@CeTJVxuX#Gp-NLM^2G23WX") #not the real password :P
 params = {'fields': 'IP,Name', 'Accept' : 'application/json'}
 headers = {'Accept': 'application/json','fields': 'IP'}
 
