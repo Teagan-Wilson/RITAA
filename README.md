@@ -11,3 +11,8 @@ POC Objectives:
 - Cache Record locally after Cloud lookup
 - If a potential threat is detected then Push record to graylog threat alarm input.
 - Delete Queued Record
+
+
+Future Objectives: 
+- Use https://github.com/Yelp/threat_intel for aditional research.
+- Add capibilites for multi-threading. 
