@@ -22,11 +22,11 @@ regex = re.compile("((192\\..*\\..*\\..*)|(10\\..*\\.*\\..*\\..*))")
 
 #Passive Total
 PTurl = 'https://api.passivetotal.org/v2/enrichment/malware'
-PTauth = ('teagan.wilson@shicksolutions.com', '4017f666d65c167ed401d05100be3cba7087f3f1eaefaa4c6928ee550907b376')
+PTauth = ('teagan.wilson@shicksolutions.com', '4017f666d65c167ed401d05100be3cba7087f3f1eaefaa4c6928ee550907b376') #keys have been regenerated... so don't bother.
 PTheaders = {'Accept': 'application/json','fields': 'IP'}
 
 #Open Threat Exchange
-headers = {'X-OTX-API-KEY': 'b53c9c947d2340ee6a141a3345522a4e49f4f16fb7a61b02de2da99b82909aa3' , 'Accept': 'application/json'}
+headers = {'X-OTX-API-KEY': 'b53c9c947d2340ee6a141a3345522a4e49f4f16fb7a61b02de2da99b82909aa3' , 'Accept': 'application/json'} #keys have been regenerated... so don't bother.
 
 
 #GrayPy Handler Setup for alarming
