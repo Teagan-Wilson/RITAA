@@ -37,25 +37,27 @@ def insertIP( ip, timestamp ):
 def insertDNS( url , timestamp ):
 	result = db.tolookupdnso.insert_one({ "url": url, "timestamp": timestamp})
 	print result.inserted_id
-	
-#Get Streams from Graylog
-#slipstreamIP = QueryGLS(ipurl)
+
+while True:
+
+	#Get Streams from Graylog
+	slipstreamDNS = QueryGLS(dnsurl)
+	slipstreamIP = QueryGLS(ipurl)
 
 
-slipstreamDNS = QueryGLS(dnsurl)
-
-#Process IP Stream and Insert into Queue
-#for ip in slipstreamIP['messages']:
-#	print(ip['message']['IP'])
-#	insert(ip['message']['IP'],timestamp)
- 
-#Process DNS logs and Insert into Queue
-for ip in slipstreamDNS['messages']:
-	pat = re.compile("\(0\)")
-	ip['message']['Name'] = pat.sub("",ip['message']['Name'])
-	pat = re.compile("^\.")
-	ip['message']['Name'] = pat.sub("",ip['message']['Name'])
-	pat = re.compile("(\(\w+\))+")
-	ip['message']['Name'] = pat.sub(".",ip['message']['Name'])
-	insertDNS(ip['message']['Name'],timestamp)
-	
+	#Process IP Stream and Insert into Queue
+	for ip in slipstreamIP['messages']:
+		print(ip['message']['IP'])
+		insertIP(ip['message']['IP'],timestamp)
+	 
+	#Process DNS logs and Insert into Queue
+	for ip in slipstreamDNS['messages']:
+		pat = re.compile("\(0\)")
+		ip['message']['Name'] = pat.sub("",ip['message']['Name'])
+		pat = re.compile("^\.")
+		ip['message']['Name'] = pat.sub("",ip['message']['Name'])
+		pat = re.compile("(\(\w+\))+")
+		ip['message']['Name'] = pat.sub(".",ip['message']['Name'])
+		insertDNS(ip['message']['Name'],timestamp)
+		
+	time.sleep(60)
