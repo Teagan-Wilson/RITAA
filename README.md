@@ -9,8 +9,10 @@ POC Objectives:
 - Making a local lookup to the MongoDB Threat Cache
 - Make a cloud lookup if no Cached record, or cached record is stale
 - Cache Record locally after Cloud lookup
-- If a potential threat is detected then Push record to graylog threat alarm input.
 - Delete Queued Record
+- If a potential threat is detected then create an incident record.
+- Validate incident threat via additional cloud resources
+- Push gathered incident data to Graylog via GELF
 
 
 Future Objectives: 
