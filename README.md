@@ -14,5 +14,4 @@ POC Objectives:
 
 
 Future Objectives: 
-- Use https://github.com/Yelp/threat_intel for aditional research.
 - Add capibilites for multi-threading. 
