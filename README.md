@@ -17,3 +17,4 @@ POC Objectives:
 
 Future Objectives: 
 - Add capibilites for multi-threading. 
+- Rewrite modules to be OO instead of procedural.
