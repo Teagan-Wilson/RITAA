@@ -2,6 +2,8 @@
 Rudimentary Intelligence and Threat Analysis Application,
 An ancillary application to add cloud based reputation and analysis web services to provide value to my Graylog instance.
 
+Project Moved to a Private Repo. May be back in the future. 
+
 POC Objectives:
 - Pull IP and DNS Data from Graylog HTTP REST API Streams - Complete
 - Queue IP and DNS information into MongoDB for processing - Complete
