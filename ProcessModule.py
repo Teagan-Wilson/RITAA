@@ -18,36 +18,35 @@ db = client.queue
 timestamp = int(time.time())
 
 #LocalIP RegEX
-regex = re.compile("((192\\..*\\..*\\..*)|(10\\..*\\.*\\..*\\..*))")
+regex = re.compile("((192\\..*\\..*\\..*)|(10\\..*\\..*\\..*\\..*))")
 
-#Passive Total
-PTurl = 'https://api.passivetotal.org/v2/enrichment/malware'
-PTauth = ('teagan.wilson@shicksolutions.com', '4017f666d65c167ed401d05100be3cba7087f3f1eaefaa4c6928ee550907b376') #keys have been regenerated... so don't bother.
-PTheaders = {'Accept': 'application/json','fields': 'IP'}
+
+ipregex = re.compile("..*\\..*\\..*\\..*")
 
 #Open Threat Exchange
-headers = {'X-OTX-API-KEY': 'b53c9c947d2340ee6a141a3345522a4e49f4f16fb7a61b02de2da99b82909aa3' , 'Accept': 'application/json'} #keys have been regenerated... so don't bother.
+headers = {'X-OTX-API-KEY': 'KEY GOES HERE' , 'Accept': 'application/json'} #keys have been regenerated... so don't bother.
 
-
-#GrayPy Handler Setup for alarming
-my_logger = logging.getLogger('RITTA-ALARM')
+#GrayPy Handler Setup for logging
+my_logger = logging.getLogger('RITTA-LOG')
 my_logger.setLevel(logging.DEBUG)
-handler = graypy.GELFHandler('localhost', 5547)
+handler = graypy.GELFHandler('localhost', 12299)
 my_logger.addHandler(handler)
+
+
 #   -------------------================================= END STATIC VARS ===============================-----------------------------
 
 #   -------------------================================= Functions ===============================-----------------------------
 #Cache Lookup Function
 def locallookup( type, value ):
 	if type == "ip":
-		result = db.cache.find({ "ip": value }).sort( [ ( "timestamp", pymongo.ASCENDING ) ] ).limit( 1 )
+		result = db.cache.find({ "ip": value }).limit( 1 )
 		if result is not None:
 			for record in result:
 				return record
 			
 			
 	if type == "DNS":
-		result = db.cache.find({ "url": value }).sort( [ ( "timestamp", pymongo.ASCENDING ) ] ).limit( 1 )
+		result = db.cache.find({ "url": value }).limit( 1 )
 		if result is not None:
 			for record in result:
 				return record
@@ -61,10 +60,26 @@ def passivetotallookup( query ):
 	loaded_content = json.loads(response.content)
 	return loaded_content
 	
+#query OTX
 def OpenThreatExchangelookupDNS( query ):
 	url = 'https://otx.alienvault.com:443/api/v1/indicators/domain/' +  query   + '/general'
 	print url
 	response = requests.get(url, headers=headers)
+	if (response.status_code != 200):
+		my_logger.debug('BAD Responce Code recived from OTX - EXITING! ' + response.status_code)
+		quit()
+	loaded_content = json.loads(response.content)
+	return loaded_content	
+	
+	
+#query OTX
+def OpenThreatExchangelookupIP( query ):
+	url = 'https://otx.alienvault.com:443/api/v1/indicators/IPv4/' +  query   + '/general'
+	print url
+	response = requests.get(url, headers=headers)
+	if (response.status_code != 200):
+		my_logger.debug('BAD Responce Code recived from OTX - EXITING! ' + response.status_code)
+		quit()
 	loaded_content = json.loads(response.content)
 	return loaded_content	
 
@@ -79,7 +94,7 @@ def cachequeuedlookup( type , record, threat ):
 		result = db.cache.insert_one({ "url": record, "timestamp": timestamp,"threat": threat})
 		return result
 
-def openincident(type,record,pulsecount)	
+def openincident(type,record,pulsecount):	
 	timestamp = int(time.time())	
 	if type == "ip":
 		result = db.incident.insert_one({ "ip": record, "timestamp": timestamp,"OTXCount": pulsecount})
@@ -93,17 +108,21 @@ def openincident(type,record,pulsecount)
 #Get Queued Lookup
 def lookupnext( type ):	
 	if type == "ip":
-		result = db.tolookupip.find().sort( [ ( "timestamp", pymongo.ASCENDING ) ] ).limit( 1 )
-		if result.count() == 1:
+		print 'making DB lookup'
+		result = db.tolookupip.find().limit( 1 )
+		if result is not None:
 			for record in result:
-				
+				print 'result recived'
+				print record['ip']
 				#Make sure we are not trying to lookup a local ip range.
-				if re.match(regex, record['ip']) is not None:
-					deletequeued("ip",record['ip'])
+				if re.match("^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$",record['ip']):
+					if re.match('/(^127\.0\.0\.1)|(^10\.)|(^172\.1[6-9]\.)|(^172\.2[0-9]\.)|(^172\.3[0-1]\.)|(^192\.168\.)|localhost/', record['ip']):
+						deletequeued("ip",record['ip'])
+					else:
+						my_logger.debug('IP-Record Grabed')
+						return record
 				else:
-					my_logger.debug('IP-Record Grabed')
-					return record
-					
+					deletequeued("ip",record['ip'])
 				
 	if type == "DNS":
 		result = db.tolookupdnso.find().sort( [ ( "timestamp", pymongo.ASCENDING ) ] ).limit( 1 )
@@ -112,9 +131,9 @@ def lookupnext( type ):
 				if 'arpa' not in record['url']:
 					my_logger.debug('DNS-Record Grabed')
 					return record
-				else:
 					deletequeued("DNS",record['url'])
-				
+				else:
+					yet = 1
 			else:
 				deletequeued("DNS",record['url'])
 				
@@ -134,10 +153,12 @@ def deletequeued( type, query ):
 
 while True:
 
+	activerecord = None
 # -------------------================================= Begin DNS Processing ===============================-----------------------------	
 	activerecord = lookupnext("DNS")
 	if activerecord is not None:
 		result = locallookup("DNS",activerecord['url'])
+		print 'DNS cache lookup'
 		if result is None: #cache miss
 			print 'cache miss'
 			time.sleep(2)
@@ -151,7 +172,7 @@ while True:
 						#QUEUE AIR RAID SIREN!
 						print(activerecord['url'])
 						openincident('DNS',activerecord['url'], result['pulse_info']['count'])	
-						#my_logger.debug('RITAA Indicates Potential Threat - ' + activerecord['url'])               # Moving Alerting to Incident Module
+						my_logger.debug('RITAA Indicates Potential Threat - ' + activerecord['url'])               # Moving Alerting to Incident Module
 						
 						cache = cachequeuedlookup("DNS",activerecord['url'],1)
 						change = deletequeued("DNS",activerecord['url'])
@@ -166,7 +187,7 @@ while True:
 						#QUEUE AIR RAID SIREN!
 						print(activerecord['url'])
 						openincident('DNS',activerecord['url'], result['pulse_info']['count'])	
-						#my_logger.debug('RITAA Indicates Potential Threat - ' + activerecord['url'])                # Moving Alerting to Incident Module
+						my_logger.debug('RITAA Indicates Potential Threat - ' + activerecord['url'])                # Moving Alerting to Incident Module
 						
 						cache = cachequeuedlookup("DNS",activerecord['url'],1)
 						change = deletequeued("DNS",activerecord['url'])
@@ -183,63 +204,62 @@ while True:
 				#QUEUE AIR RAID SIREN!
 				print(activerecord['url'])
 				openincident('DNS',activerecord['url'], result['pulse_info']['count'])	
-				#my_logger.debug('RITAA Indicates Potential Threat - ' + activerecord['url'])                        # Moving Alerting to Incident Module
+				my_logger.debug('RITAA Indicates Potential Threat - ' + activerecord['url'])                        # Moving Alerting to Incident Module
 				change = deletequeued("DNS",activerecord['url'])
 			else:
 				change = deletequeued("DNS",activerecord['url'])
 	else:
 		print 'No DNS record to process. Checking DNS.' 
-		
+		time.sleep(2)
 		
 #         -------------------================================= Begin END DNS Processing ===============================-----------------------------	
 
 #         -------------------=================================  Begin IP Processing   ===============================-----------------------------
 
-#Get Next
-activerecord = lookupnext("ip")
+	#Get Next
+	activerecord = lookupnext("ip")
 
 	#Did we return a record?
 	if activerecord is not None:
-	
 		#Yes, Attempt Local Lookup
 		result = locallookup("ip",activerecord['ip'])
-		
+		print 'ip cache lookup'
 		#Was it in the Local Cache?
 		if result is None: #cache miss
 			print 'cache miss'
 			
-			#Sleep Timer in the loop to slow down OTX lookups
-			time.sleep(2)
+			
 			
 			#Send Cache Miss event to GrayLog
 			my_logger.debug('CacheMiss')
 			
 			
 			#Validate Input Length
-			if len(activerecord['ip']) <= 16:
+			if (activerecord['ip'].isupper() or activerecord['ip'].islower()) is not True:
+				#Sleep Timer in the loop to slow down OTX lookups
+				time.sleep(2)
+				
+				#Attempt OTX lookup   
+				result = OpenThreatExchangelookupIP(activerecord['ip'])
+				
+				print(result)
+				
+				
+				#QUEUE AIR RAID SIREN?
+				if result['pulse_info']['count'] >= 1:
+					print(activerecord['ip'])
+					my_logger.debug('RITAA Indicates Potential Threat - ' + activerecord['ip'])               # Moving Alerting to Incident Module
 					
-					#Attempt OTX lookup   
-					result = OpenThreatExchangelookupIP(activerecord['ip'])
+					#Log Incident Record
+					openincident('ip',activerecord['ip'], result['pulse_info']['count'])
 					
-					print(result)
-					print(result['pulse_info']['count'] >= 1)
-					
-					#QUEUE AIR RAID SIREN?
-					if result['pulse_info']['count'] >= 1:
-						
-						print(activerecord['ip'])
-						#my_logger.debug('RITAA Indicates Potential Threat - ' + activerecord['url'])               # Moving Alerting to Incident Module
-						
-						#Log Incident Record
-						openincident('ip',activerecord['ip'], result['pulse_info']['count'])
-						
-						#Cache OTX lookup and Delete Queued Record
-						cache = cachequeuedlookup("ip",activerecord['ip'],1)
-						change = deletequeued("ip",activerecord['ip'])
-					else:
-						#Cache OTX lookup and Delete Queued Record
-						cache = cachequeuedlookup("ip",activerecord['ip'],0)
-						change = deletequeued("ip",activerecord['ip'])
+					#Cache OTX lookup and Delete Queued Record
+					cache = cachequeuedlookup("ip",activerecord['ip'],1)
+					change = deletequeued("ip",activerecord['ip'])
+				else:
+					#Cache OTX lookup and Delete Queued Record
+					cache = cachequeuedlookup("ip",activerecord['ip'],0)
+					change = deletequeued("ip",activerecord['ip'])
 
 			else:
 				#ip malformed, delete queued
@@ -254,10 +274,10 @@ activerecord = lookupnext("ip")
 			if result['threat'] == 1:
 				
 				print(activerecord['ip'])
-				#my_logger.debug('RITAA Indicates Potential Threat - ' + activerecord['url'])                        # Moving Alerting to Incident Module
+				my_logger.debug('RITAA Indicates Potential Threat - ' + activerecord['ip'])                        # Moving Alerting to Incident Module
 				
 				#Log Incident Record
-				openincident('ip',activerecord['ip'], result['pulse_info']['count'])				
+				openincident('ip',activerecord['ip'])				
 				
 				#Delete Queued Record
 				change = deletequeued("ip",activerecord['ip'])
@@ -266,7 +286,7 @@ activerecord = lookupnext("ip")
 				change = deletequeued("ip",activerecord['ip'])
 	else:
 		print 'No IP record to process. Checking DNS.' 
-
+		time.sleep(2)
 #         -------------------=================================   End IP Processing   ===============================-----------------------------
 
 #         -------------------=================================   End Main   ===============================-----------------------------
