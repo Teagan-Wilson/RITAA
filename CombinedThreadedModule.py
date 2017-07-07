@@ -438,12 +438,20 @@ def queryModule():
 			insertDNS(ip['message']['Name'],timestamp)
 		#   -------------------================================= Begin Process Module==============================-----------------------------
 		
+		
+qthreads = []
+pthreads = []
+ithreads = []
+for x in range(querythreads):
+	t = threading.Thread(target=queryModule)
+	qthreads.append(t)
+	t.start()
 
-for x in xrange(querythreads)
-	threading.Thread(target=queryModule)
-
-for x in xrange(processthreads)
-	threading.Thread(target=processModule)
-
-for x in xrange(incidentthreads)
-	threading.Thread(target=incidentModule)
+for x in range(processthreads):
+	t = threading.Thread(target=processModule)
+	pthreads.append(t)
+	t.start()
+for x in range(incidentthreads):
+	t = threading.Thread(target=incidentModule)
+	ithreads.append(t)
+	t.start()
