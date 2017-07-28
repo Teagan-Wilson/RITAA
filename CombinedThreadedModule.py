@@ -10,15 +10,13 @@ import threading
 import urllib2
 from passivetotal.libs.enrichment import EnrichmentRequest
 from passivetotal.response import Response
+import pdb
 
 querythreads = 1
-processthreads = 20
+processthreads = 3
 incidentthreads = 1
 
 def processModule():
-	#   -------------------================================= Begin Process Module==============================-----------------------------
-
-	#   -------------------=================================STATIC VARS===============================-----------------------------
 	#Setup Database Connection
 	client = MongoClient()
 	db = client.queue
@@ -33,12 +31,13 @@ def processModule():
 	ipregex = re.compile("..*\\..*\\..*\\..*")
 
 	#Open Threat Exchange
-	headers = {'X-OTX-API-KEY': 'PUT OTX API KEY HERE' , 'Accept': 'application/json'} 
+	headers = {'X-OTX-API-KEY': '' , 'Accept': 'application/json'} 
 
 	#GrayPy Handler Setup for logging
+
 	my_logger = logging.getLogger('RITTA-LOG')
 	my_logger.setLevel(logging.DEBUG)
-	handler = graypy.GELFHandler('localhost', 12299) #Change host and ports as nessicary
+	handler = graypy.GELFHandler('localhost', 12299) #Hostname, port
 	my_logger.addHandler(handler)
 
 
@@ -73,7 +72,7 @@ def processModule():
 	def OpenThreatExchangelookupDNS( query ):
 		url = 'https://otx.alienvault.com:443/api/v1/indicators/domain/' +  query   + '/general'
 		print url
-		my_logger.debug('DNS OTX lookup made.')
+		my_logger.debug('DNS OTX lookup made for ' + query )
 		response = requests.get(url, headers=headers)
 		if (response.status_code != 200):
 			my_logger.debug('BAD Responce Code recived from OTX - EXITING! ' + response.status_code)
@@ -86,7 +85,7 @@ def processModule():
 	def OpenThreatExchangelookupIP( query ):
 		url = 'https://otx.alienvault.com:443/api/v1/indicators/IPv4/' +  query   + '/general'
 		print url
-		my_logger.debug('IP OTX lookup made.')
+		my_logger.debug('IP OTX lookup made ' + query )
 		response = requests.get(url, headers=headers)
 		if (response.status_code != 200):
 			my_logger.debug('BAD Responce Code recived from OTX - EXITING! ' + response.status_code)
@@ -120,7 +119,7 @@ def processModule():
 	def lookupnext( type ):	
 		if type == "ip":
 			print 'making DB lookup'
-			result = db.tolookupip.find().limit( 1 )
+			result = db.tolookupip.find_one_and_delete({})
 			if result is not None:
 				for record in result:
 					print 'result recived'
@@ -136,13 +135,13 @@ def processModule():
 						deletequeued("ip",record['ip'])
 					
 		if type == "DNS":
-			result = db.tolookupdnso.find().sort( [ ( "timestamp", pymongo.ASCENDING ) ] ).limit( 1 )
+			result = db.tolookupdnso.find_one_and_delete({})
 			for record in result:
 				if 'local' not in record['url']:
 					if 'arpa' not in record['url']:
 						my_logger.debug('DNS-Record Grabed')
 						return record
-						deletequeued("DNS",record['url'])
+						
 					else:
 						yet = 1
 				else:
@@ -151,11 +150,11 @@ def processModule():
 	#Delete queued lookup
 	def deletequeued( type, query ): 
 		if type == "ip":
-			result = db.tolookupip.delete_one({'ip': query})
+			result = db.tolookupip.delete_many({'ip': query})
 			return result
 			
 		if type == "DNS":
-			result = db.tolookupdnso.delete_one({'url': query})
+			result = db.tolookupdnso.delete_many({'url': query})
 			return result
 	#   -------------------================================= END Functions ===============================-----------------------------	
 		
@@ -298,9 +297,7 @@ def processModule():
 		else:
 			print 'No IP record to process. Checking DNS.' 
 			time.sleep(2)
-		#         -------------------=================================   End IP Processing   ===============================-----------------------------
-		#         -------------------=================================   END Process Module  ===============================-----------------------------
-	
+
 def incidentModule():
 	#   -------------------================================= Begin Incident Module==============================-----------------------------
 	#Setup Database Connection
@@ -310,13 +307,13 @@ def incidentModule():
 	#GrayPy Handler Setup for alarming
 	my_logger = logging.getLogger('RITTA-ALARM')
 	my_logger.setLevel(logging.WARNING)
-	handler = graypy.GELFHandler('localhost', 5547) #Change host and ports as nessicary
+	handler = graypy.GELFHandler('localhost', 5547) #Hostname, port
 	my_logger.addHandler(handler)
 
 	#GrayPy Handler Setup for logging
 	my_logger2 = logging.getLogger('RITTA-LOG')
 	my_logger2.setLevel(logging.DEBUG)
-	handler2 = graypy.GELFHandler('localhost', 12299) #Change host and ports as nessicary
+	handler2 = graypy.GELFHandler('localhost', 12299) #Hostname, port
 	my_logger2.addHandler(handler2)
 
 	#Cloud Lookup Functions
@@ -328,13 +325,17 @@ def incidentModule():
 		
 	#Passive Total
 	PTurl = 'https://api.passivetotal.org/v2/enrichment/malware'
-	PTauth = ('-=PASSIVE TOTAL CREDENTIALS GO HERE=-', '-=AND HERE=-')
+	PTauth = ('', '') #Passive Total Username, password
 	PTheaders = {'Accept': 'application/json','fields': 'IP'}
+
+
+	#Static Variables
+	timestamp = int(time.time())
 
 	#Query Passive Total
 	def secondLevelCheck( type , record ):
 		if record is not None:
-			client = EnrichmentRequest('teagan.wilson@shicksolutions.com', '90aa9d3cd6d722db84281c9b178f723c67cab1b2cc80275957ae5e21f8c14862')
+			client = EnrichmentRequest('', '') #Passive Total Username, api key
 			
 			if type == "ip":
 				payload = {'query': record['ip']}
@@ -394,11 +395,11 @@ def queryModule():
 
 	#Static Variables
 	timestamp = int(time.time())
-	ipurl = 'https://graylog.shickusa.com:12900/search/universal/relative?query=*&range=60&limit=1000&filter=streams: -=STREAM ID GOES HERE=-'
-	dnsurl = 'https://graylog.shickusa.com:12900/search/universal/relative?query=*&range=60&limit=1000&filter=streams: -=STREAM ID GOES HERE=-'
-	auth = ("Display", "-=PASSWORD FOR DISPLAY USER GOES HERE=-")
+	ipurl = '' #URL for Graylog IP Stream
+	dnsurl = '' #URL for Graylog DNS Stream
+	auth = ("", "") #Username, Password
 	params = {'fields': 'DestinationIP,Name', 'Accept' : 'application/json'}
-	headers = {'Accept': 'application/json','fields': 'DestinationIP'}
+	headers = {'Accept': 'application/json','fields': 'DestinationIP,Name'}
 
 
 	#Query Stream Function
@@ -437,7 +438,6 @@ def queryModule():
 			ip['message']['Name'] = pat.sub(".",ip['message']['Name'])
 			insertDNS(ip['message']['Name'],timestamp)
 		#   -------------------================================= Begin Process Module==============================-----------------------------
-		
 		
 qthreads = []
 pthreads = []
